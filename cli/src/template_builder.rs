@@ -895,6 +895,20 @@ fn builtin_string_methods<'a, L: TemplateLanguage<'a> + ?Sized>(
             Ok(L::wrap_string(out_property))
         },
     );
+    map.insert(
+        "replace",
+        |language, diagnostics, build_ctx, self_property, function| {
+            let [from, to] = function.expect_exact_arguments()?;
+
+            let from = expect_plain_text_expression(language, diagnostics, build_ctx, from)?;
+            let to = expect_plain_text_expression(language, diagnostics, build_ctx, to)?;
+
+            let out_property = (self_property, from, to)
+                .map(|(self_propety, from, to)| self_propety.replace(&from, &to));
+
+            Ok(L::wrap_string(out_property))
+        },
+    );
     map
 }
 
