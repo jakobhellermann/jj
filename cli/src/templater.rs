@@ -133,7 +133,20 @@ pub type SizeHint = (usize, Option<usize>);
 
 impl Template for String {
     fn format(&self, formatter: &mut TemplateFormatter) -> io::Result<()> {
-        write!(formatter, "{self}")
+        let available_width = formatter.size_hint;
+        let ellipsis = "…";
+
+        if available_width < 0 {
+            write!(formatter, "{self}")
+        } else if self.len() <= available_width as usize {
+            write!(formatter, "{self}")
+        } else {
+            write!(
+                formatter,
+                "{}{ellipsis}",
+                &self[0..available_width as usize - ellipsis.len()]
+            )
+        }
     }
 }
 
@@ -742,6 +755,7 @@ impl<'a, C: Clone> TemplateRenderer<'a, C> {
 pub struct TemplateFormatter<'a> {
     formatter: &'a mut dyn Formatter,
     error_handler: PropertyErrorHandler,
+    size_hint: isize,
 }
 
 impl<'a> TemplateFormatter<'a> {
@@ -749,6 +763,8 @@ impl<'a> TemplateFormatter<'a> {
         TemplateFormatter {
             formatter,
             error_handler,
+            // size_hint: isize::MAX,
+            size_hint: 32,
         }
     }
 
@@ -782,7 +798,34 @@ impl<'a> TemplateFormatter<'a> {
     }
 
     pub fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> io::Result<()> {
-        self.formatter.write_fmt(args)
+        struct Adapter<'a, T: ?Sized + 'a> {
+            inner: &'a mut T,
+            error: std::io::Result<()>,
+            size_hint: &'a mut isize,
+        }
+
+        impl<T: Write + ?Sized> fmt::Write for Adapter<'_, T> {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                *self.size_hint -= s.len() as isize;
+                match self.inner.write_all(s.as_bytes()) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        self.error = Err(e);
+                        Err(fmt::Error)
+                    }
+                }
+            }
+        }
+
+        let mut output = Adapter {
+            inner: self.formatter,
+            error: Ok(()),
+            size_hint: &mut self.size_hint,
+        };
+        match fmt::write(&mut output, args) {
+            Ok(()) => Ok(()),
+            Err(_) => output.error,
+        }
     }
 
     /// Handles the given template property evaluation error.
