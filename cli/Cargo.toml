@@ -76,6 +76,7 @@ globset = { workspace = true }
 indexmap = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+jiff = { version = "0.1.28", default-features = false }
 jj-lib = { workspace = true }
 maplit = { workspace = true }
 once_cell = { workspace = true }
