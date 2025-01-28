@@ -91,6 +91,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * Commands that used to suggest `--ignore-immutable` now print the number of
   immutable commits that would be rewritten if used and a link to the docs.
 
+* Added `revsets.log-graph-prioritize`, which can be used to configure
+  which branch in the `jj log` graph is displayed on the left instead of `@`
+  (e.g. `coalesce(description("megamerge\n"), trunk())`)
+
 ### Fixed bugs
 
 * `jj status` now shows untracked files under untracked directories.
