@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 use crossterm::queue;
 use crossterm::style::Attribute;
-use crossterm::style::Color;
+pub use crossterm::style::Color;
 use crossterm::style::SetAttribute;
 use crossterm::style::SetBackgroundColor;
 use crossterm::style::SetForegroundColor;
@@ -270,7 +270,7 @@ pub struct Style {
 }
 
 impl Style {
-    fn merge(&mut self, other: &Style) {
+    pub fn merge(&mut self, other: &Style) {
         self.fg = other.fg.or(self.fg);
         self.bg = other.bg.or(self.bg);
         self.bold = other.bold.or(self.bold);
@@ -429,7 +429,7 @@ impl<W: Write> ColorFormatter<W> {
     }
 }
 
-fn rules_from_config(config: &StackedConfig) -> Result<Rules, ConfigGetError> {
+pub fn rules_from_config(config: &StackedConfig) -> Result<Rules, ConfigGetError> {
     config
         .table_keys("colors")
         .map(|key| {
