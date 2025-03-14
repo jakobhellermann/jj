@@ -35,7 +35,7 @@ use crate::ui::Ui;
 /// Annotates a revision line by line. Each line includes the source change that
 /// introduced the associated line. A path to the desired file must be provided.
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileAnnotateArgs {
+pub struct FileAnnotateArgs {
     /// the file to annotate
     #[arg(
         value_hint = clap::ValueHint::AnyPath,

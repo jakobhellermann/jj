@@ -33,7 +33,7 @@ use crate::ui::Ui;
 /// does not exist, it will be created. If no directory is given, the current
 /// directory is used.
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct DebugInitSimpleArgs {
+pub struct DebugInitSimpleArgs {
     /// The destination directory
     #[arg(default_value = ".", value_hint = clap::ValueHint::DirPath)]
     destination: String,

@@ -30,7 +30,7 @@ use crate::ui::Ui;
 
 /// Stop tracking specified paths in the working copy
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileUntrackArgs {
+pub struct FileUntrackArgs {
     /// Paths to untrack. They must already be ignored.
     ///
     /// The paths could be ignored via a .gitignore or .git/info/exclude (in
