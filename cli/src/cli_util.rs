@@ -3636,7 +3636,7 @@ pub fn format_template<C: Clone>(ui: &Ui, arg: &C, template: &TemplateRenderer<C
 /// CLI command builder and runner.
 #[must_use]
 pub struct CliRunner {
-    tracing_subscription: TracingSubscription,
+    tracing_subscription: Option<TracingSubscription>,
     app: Command,
     config_layers: Vec<ConfigLayer>,
     config_migrations: Vec<ConfigMigrationRule>,
@@ -3660,9 +3660,14 @@ impl CliRunner {
     /// as early as possible.
     pub fn init() -> Self {
         let tracing_subscription = TracingSubscription::init();
+        let mut runner = CliRunner::new();
+        runner.tracing_subscription = Some(tracing_subscription);
+        runner
+    }
+    pub fn new() -> Self {
         crate::cleanup_guard::init();
         CliRunner {
-            tracing_subscription,
+            tracing_subscription: None,
             app: crate::commands::default_app(),
             config_layers: crate::config::default_config_layers(),
             config_migrations: crate::config::default_config_migrations(),
@@ -3811,7 +3816,11 @@ impl CliRunner {
     }
 
     #[instrument(skip_all)]
-    fn run_internal(self, ui: &mut Ui, mut raw_config: RawConfig) -> Result<(), CommandError> {
+    pub fn get_command_helper(
+        self,
+        ui: &mut Ui,
+        mut raw_config: RawConfig,
+    ) -> Result<CommandHelper, CommandError> {
         // `cwd` is canonicalized for consistency with `Workspace::workspace_root()` and
         // to easily compute relative paths between them.
         let cwd = env::current_dir()
@@ -3845,9 +3854,9 @@ impl CliRunner {
         migrate_config(&mut config)?;
         ui.reset(&config)?;
 
-        if env::var_os("COMPLETE").is_some() {
+        /*if env::var_os("COMPLETE").is_some() {
             return handle_shell_completion(&Ui::null(), &self.app, &config, &cwd);
-        }
+        }*/
 
         let string_args = expand_args(ui, &self.app, env::args_os(), &config)?;
         let (args, config_layers) = parse_early_args(&self.app, &string_args)?;
@@ -3872,7 +3881,9 @@ impl CliRunner {
             .map_err(|err| map_clap_cli_error(err, ui, &config))?;
         if args.global_args.debug {
             // TODO: set up debug logging as early as possible
-            self.tracing_subscription.enable_debug_logging()?;
+            if let Some(tracing_subscription) = &self.tracing_subscription {
+                tracing_subscription.enable_debug_logging()?;
+            }
         }
         for process_global_args_fn in self.process_global_args_fns {
             process_global_args_fn(ui, &matches)?;
@@ -3931,10 +3942,18 @@ impl CliRunner {
         let command_helper = CommandHelper {
             data: Rc::new(command_helper_data),
         };
-        for start_hook_fn in self.start_hook_fns {
+        Ok(command_helper)
+    }
+    pub fn run_internal(mut self, ui: &mut Ui, raw_config: RawConfig) -> Result<(), CommandError> {
+        let dispatch_fn = std::mem::replace(&mut self.dispatch_fn, Box::new(|_, _| unreachable!()));
+        let start_hook_fns = std::mem::take(&mut self.start_hook_fns);
+
+        let command_helper = self.get_command_helper(ui, raw_config)?;
+
+        for start_hook_fn in start_hook_fns {
             start_hook_fn(ui, &command_helper)?;
         }
-        (self.dispatch_fn)(ui, &command_helper)
+        dispatch_fn(ui, &command_helper)
     }
 
     #[must_use]

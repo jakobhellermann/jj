@@ -37,7 +37,7 @@ use crate::ui::Ui;
 /// don't match the pattern can be manually tracked using this command. The
 /// default pattern is `all()` and this command has no effect.
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileTrackArgs {
+pub struct FileTrackArgs {
     /// Paths to track
     #[arg(required = true, value_name = "FILESETS", value_hint = clap::ValueHint::AnyPath)]
     paths: Vec<String>,

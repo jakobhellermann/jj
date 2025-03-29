@@ -25,7 +25,7 @@ use crate::ui::Ui;
 
 /// List files in a revision
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileListArgs {
+pub struct FileListArgs {
     /// The revision to list files in
     #[arg(
         long, short,
