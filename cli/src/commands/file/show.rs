@@ -42,7 +42,7 @@ use crate::ui::Ui;
 /// If the given path is a directory, files in the directory will be visited
 /// recursively.
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileShowArgs {
+pub struct FileShowArgs {
     /// The revision to get the file contents from
     #[arg(
         long, short,

@@ -99,7 +99,7 @@ pub struct GitPushArgs {
     /// This defaults to the `git.push` setting. If that is not configured, and
     /// if there are multiple remotes, the remote named "origin" will be used.
     #[arg(long, add = ArgValueCandidates::new(complete::git_remotes))]
-    remote: Option<RemoteNameBuf>,
+    pub remote: Option<RemoteNameBuf>,
     /// Push only this bookmark, or bookmarks matching a pattern (can be
     /// repeated)
     ///
@@ -114,10 +114,10 @@ pub struct GitPushArgs {
         value_parser = StringPattern::parse,
         add = ArgValueCandidates::new(complete::local_bookmarks),
     )]
-    bookmark: Vec<StringPattern>,
+    pub bookmark: Vec<StringPattern>,
     /// Push all bookmarks (including new bookmarks)
     #[arg(long)]
-    all: bool,
+    pub all: bool,
     /// Push all tracked bookmarks
     ///
     /// This usually means that the bookmark was already pushed to or fetched
@@ -126,14 +126,14 @@ pub struct GitPushArgs {
     /// [relevant remote]:
     ///     https://jj-vcs.github.io/jj/latest/bookmarks#remotes-and-tracked-bookmarks
     #[arg(long)]
-    tracked: bool,
+    pub tracked: bool,
     /// Push all deleted bookmarks
     ///
     /// Only tracked bookmarks can be successfully deleted on the remote. A
     /// warning will be printed if any untracked bookmarks on the remote
     /// correspond to missing local bookmarks.
     #[arg(long, conflicts_with = "specific")]
-    deleted: bool,
+    pub deleted: bool,
     /// Allow pushing new bookmarks
     ///
     /// Newly-created remote bookmarks will be tracked automatically.
@@ -141,17 +141,17 @@ pub struct GitPushArgs {
     /// This can also be turned on by the `git.push-new-bookmarks` setting. If
     /// it's set to `true`, `--allow-new` is no-op.
     #[arg(long, short = 'N', conflicts_with = "what")]
-    allow_new: bool,
+    pub allow_new: bool,
     /// Allow pushing commits with empty descriptions
     #[arg(long)]
-    allow_empty_description: bool,
+    pub allow_empty_description: bool,
     /// Allow pushing commits that are private
     ///
     /// The set of private commits can be configured by the
     /// `git.private-commits` setting. The default is `none()`, meaning all
     /// commits are eligible to be pushed.
     #[arg(long)]
-    allow_private: bool,
+    pub allow_private: bool,
     /// Push bookmarks pointing to these commits (can be repeated)
     #[arg(
         long,
@@ -162,7 +162,7 @@ pub struct GitPushArgs {
         // special-purpose branches.
         add = ArgValueCompleter::new(complete::revset_expression_all),
     )]
-    revisions: Vec<RevisionArg>,
+    pub revisions: Vec<RevisionArg>,
     /// Push this commit by creating a bookmark based on its change ID (can be
     /// repeated)
     ///
@@ -179,7 +179,7 @@ pub struct GitPushArgs {
         // turns out to be wrong.
         add = ArgValueCompleter::new(complete::revset_expression_mutable),
     )]
-    change: Vec<RevisionArg>,
+    pub change: Vec<RevisionArg>,
     /// Specify a new bookmark name and a revision to push under that name, e.g.
     /// '--named myfeature=@'
     ///
@@ -189,10 +189,10 @@ pub struct GitPushArgs {
         value_name = "NAME=REVISION",
         add = ArgValueCompleter::new(complete::branch_name_equals_any_revision)
     )]
-    named: Vec<String>,
+    pub named: Vec<String>,
     /// Only display what will change on the remote
     #[arg(long)]
-    dry_run: bool,
+    pub dry_run: bool,
 }
 
 fn make_bookmark_term(bookmark_names: &[impl fmt::Display]) -> String {

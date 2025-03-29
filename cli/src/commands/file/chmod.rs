@@ -42,7 +42,7 @@ enum ChmodMode {
 /// Unlike the POSIX `chmod`, `jj file chmod` also works on Windows, on
 /// conflicted files, and on arbitrary revisions.
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct FileChmodArgs {
+pub struct FileChmodArgs {
     mode: ChmodMode,
     /// The revision to update
     #[arg(

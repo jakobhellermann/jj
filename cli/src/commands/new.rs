@@ -44,27 +44,27 @@ use crate::ui::Ui;
 /// [working copy]:
 ///     https://jj-vcs.github.io/jj/latest/working-copy/
 #[derive(clap::Args, Clone, Debug)]
-pub(crate) struct NewArgs {
+pub struct NewArgs {
     /// Parent(s) of the new change
     #[arg(
         default_value = "@",
         value_name = "REVSETS",
         add = ArgValueCompleter::new(complete::revset_expression_all),
     )]
-    revisions: Option<Vec<RevisionArg>>,
+    pub revisions: Option<Vec<RevisionArg>>,
     /// Ignored (but lets you pass `-d`/`-r` for consistency with other
     /// commands)
     #[arg(short = 'd', hide = true, short_alias = 'r',  action = clap::ArgAction::Count)]
-    unused_destination: u8,
+    pub unused_destination: u8,
     /// The change description to use
     #[arg(long = "message", short, value_name = "MESSAGE")]
-    message_paragraphs: Vec<String>,
+    pub message_paragraphs: Vec<String>,
     /// Do not edit the newly created change
     #[arg(long, conflicts_with = "_edit")]
-    no_edit: bool,
+    pub no_edit: bool,
     /// No-op flag to pair with --no-edit
     #[arg(long, hide = true)]
-    _edit: bool,
+    pub _edit: bool,
     /// Insert the new change after the given commit(s)
     ///
     /// Example: `jj new --after A` creates a new change between `A` and its
@@ -100,7 +100,7 @@ pub(crate) struct NewArgs {
         verbatim_doc_comment,
         add = ArgValueCompleter::new(complete::revset_expression_all),
     )]
-    insert_after: Option<Vec<RevisionArg>>,
+    pub insert_after: Option<Vec<RevisionArg>>,
     /// Insert the new change before the given commit(s)
     ///
     /// Example: `jj new --before C` creates a new change between `C` and its
@@ -139,15 +139,11 @@ pub(crate) struct NewArgs {
         verbatim_doc_comment,
         add = ArgValueCompleter::new(complete::revset_expression_mutable),
     )]
-    insert_before: Option<Vec<RevisionArg>>,
+    pub insert_before: Option<Vec<RevisionArg>>,
 }
 
 #[instrument(skip_all)]
-pub(crate) fn cmd_new(
-    ui: &mut Ui,
-    command: &CommandHelper,
-    args: &NewArgs,
-) -> Result<(), CommandError> {
+pub fn cmd_new(ui: &mut Ui, command: &CommandHelper, args: &NewArgs) -> Result<(), CommandError> {
     let mut workspace_command = command.workspace_helper(ui)?;
 
     let (parent_commit_ids, child_commit_ids) = compute_commit_location(

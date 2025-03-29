@@ -267,6 +267,7 @@ pub struct Style {
     pub italic: Option<bool>,
     pub underline: Option<bool>,
     pub reverse: Option<bool>,
+    pub monospace: Option<bool>,
 }
 
 impl Style {
@@ -277,6 +278,7 @@ impl Style {
         self.italic = other.italic.or(self.italic);
         self.underline = other.underline.or(self.underline);
         self.reverse = other.reverse.or(self.reverse);
+        self.monospace = other.monospace.or(self.monospace);
     }
 }
 
@@ -446,6 +448,7 @@ pub fn rules_from_config(config: &StackedConfig) -> Result<Rules, ConfigGetError
                         italic: None,
                         underline: None,
                         reverse: None,
+                        monospace: None,
                     })
                 } else if value.is_inline_table() {
                     Style::deserialize(value.into_deserializer())
