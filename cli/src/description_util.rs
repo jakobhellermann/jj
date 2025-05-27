@@ -174,7 +174,6 @@ where
 pub fn edit_description(editor: &TextEditor, description: &str) -> Result<String, CommandError> {
     let mut description = description.to_owned();
     append_blank_line(&mut description);
-    description.push_str("JJ: Lines starting with \"JJ:\" (like this one) will be removed.\n");
 
     let description = editor
         .edit_str(description, Some(".jjdescription"))
