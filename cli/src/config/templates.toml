@@ -123,6 +123,7 @@ concat(
     "JJ: This commit contains the following changes:\n", "",
     indent("JJ:     ", diff.summary()),
   ),
+  "JJ: Lines starting with \"JJ:\" (like this one) will be removed.\n"
 )
 '''
 
