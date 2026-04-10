@@ -27,27 +27,13 @@ fn test_rebase_invalid() {
     create_commit(&work_dir, "a", &[]);
     create_commit(&work_dir, "b", &["a"]);
 
-    // Missing destination
-    let output = work_dir.run_jj(["rebase"]);
-    insta::assert_snapshot!(output, @"
-    ------- stderr -------
-    error: the following required arguments were not provided:
-      <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
-
-    Usage: jj rebase <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
-
-    For more information, try '--help'.
-    [EOF]
-    [exit status: 2]
-    ");
-
     // Both -r and -s
     let output = work_dir.run_jj(["rebase", "-r", "a", "-s", "a", "-o", "b"]);
     insta::assert_snapshot!(output, @"
     ------- stderr -------
     error: the argument '--revision <REVSETS>' cannot be used with '--source <REVSETS>'
 
-    Usage: jj rebase --revision <REVSETS> <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
+    Usage: jj rebase --revision <REVSETS> --onto <REVSETS>
 
     For more information, try '--help'.
     [EOF]
@@ -60,7 +46,7 @@ fn test_rebase_invalid() {
     ------- stderr -------
     error: the argument '--branch <REVSETS>' cannot be used with '--source <REVSETS>'
 
-    Usage: jj rebase --branch <REVSETS> <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
+    Usage: jj rebase --branch <REVSETS> --onto <REVSETS>
 
     For more information, try '--help'.
     [EOF]
@@ -73,7 +59,7 @@ fn test_rebase_invalid() {
     ------- stderr -------
     error: the argument '--onto <REVSETS>' cannot be used with '--insert-after <REVSETS>'
 
-    Usage: jj rebase --revision <REVSETS> <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
+    Usage: jj rebase --revision <REVSETS> --onto <REVSETS>
 
     For more information, try '--help'.
     [EOF]
@@ -86,7 +72,7 @@ fn test_rebase_invalid() {
     ------- stderr -------
     error: the argument '--onto <REVSETS>' cannot be used with '--insert-before <REVSETS>'
 
-    Usage: jj rebase --revision <REVSETS> <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>
+    Usage: jj rebase --revision <REVSETS> --onto <REVSETS>
 
     For more information, try '--help'.
     [EOF]
@@ -127,6 +113,75 @@ fn test_rebase_invalid() {
     Error: Cannot rebase 7d980be7a1d4 onto itself
     [EOF]
     [exit status: 1]
+    ");
+}
+
+#[test]
+fn test_rebase_default_destination() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    create_commit(&work_dir, "a", &[]);
+    create_commit(&work_dir, "b", &["a"]);
+    create_commit(&work_dir, "c", &["b"]);
+    // Test the setup
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  c: b
+    ○  b: a
+    ○  a
+    ◆
+    [EOF]
+    ");
+
+    // Override default-rebase-target to use bookmark "a"
+    test_env.add_config(r#"revsets.default-rebase-target = "a""#);
+
+    // `jj rebase` with no args should behave like `jj rebase -b @ -o a`
+    let output = work_dir.run_jj(["rebase"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Skipped rebase of 2 commits that were already in place
+    Nothing changed.
+    [EOF]
+    ");
+
+    // Now make a commit not on top of "a" and rebase it
+    create_commit(&work_dir, "d", &[]);
+    work_dir
+        .run_jj(["rebase", "-r", "d", "-o", "root()"])
+        .success();
+    work_dir.run_jj(["new", "d"]).success();
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  : d
+    ○  d
+    │ ○  c: b
+    │ ○  b: a
+    │ ○  a
+    ├─╯
+    ◆
+    [EOF]
+    ");
+
+    // `jj rebase` should rebase @ branch onto "a"
+    let output = work_dir.run_jj(["rebase"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Rebased 2 commits to destination
+    Working copy  (@) now at: wqnwkozp ffaaf299 (empty) (no description set)
+    Parent commit (@-)      : znkkpsqq 9e8d12ed d | d
+    Added 1 files, modified 0 files, removed 0 files
+    [EOF]
+    ");
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  : d
+    ○  d: a
+    │ ○  c: b
+    │ ○  b: a
+    ├─╯
+    ○  a
+    ◆
+    [EOF]
     ");
 }
 

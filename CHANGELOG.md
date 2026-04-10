@@ -34,6 +34,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lines and fine-grained control over when the tool is run. If you have set the `line-range-arg`
   config, use `--all-lines` to match the previous behavior of formatting the entire file.
 
+* `jj rebase` without arguments now defaults to `-b @ -o trunk()`. The
+  destination can be configured with the new `revsets.default-rebase-target`
+  config option.
+
 ### Fixed bugs
 
 * Improving consistency with `git` handling of `.gitignore`, including `/`

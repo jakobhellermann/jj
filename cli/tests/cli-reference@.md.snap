@@ -2790,7 +2790,7 @@ K |         K |
 J           J
 ```
 
-**Usage:** `jj rebase [OPTIONS] <--onto <REVSETS>|--insert-after <REVSETS>|--insert-before <REVSETS>>`
+**Usage:** `jj rebase [OPTIONS]`
 
 ###### **Options:**
 

@@ -326,7 +326,6 @@ pub(crate) struct RebaseArgs {
 }
 
 #[derive(clap::Args, Clone, Debug)]
-#[group(required = true)]
 pub struct RebaseDestinationArgs {
     /// The revision(s) to rebase onto (can be repeated to create a merge
     /// commit)
@@ -383,12 +382,28 @@ pub(crate) async fn cmd_rebase(
     };
     let mut workspace_command = command.workspace_helper(ui)?;
 
-    let loc = if !args.revisions.is_empty() {
-        plan_rebase_revisions(ui, &workspace_command, &args.revisions, &args.destination).await?
-    } else if !args.source.is_empty() {
-        plan_rebase_source(ui, &workspace_command, &args.source, &args.destination).await?
+    let destination = if args.destination.onto.is_some()
+        || args.destination.insert_after.is_some()
+        || args.destination.insert_before.is_some()
+    {
+        args.destination.clone()
     } else {
-        plan_rebase_branch(ui, &workspace_command, &args.branch, &args.destination).await?
+        let revs = workspace_command
+            .settings()
+            .get_string("revsets.default-rebase-target")?;
+        RebaseDestinationArgs {
+            onto: Some(vec![RevisionArg::from(revs)]),
+            insert_after: None,
+            insert_before: None,
+        }
+    };
+
+    let loc = if !args.revisions.is_empty() {
+        plan_rebase_revisions(ui, &workspace_command, &args.revisions, &destination).await?
+    } else if !args.source.is_empty() {
+        plan_rebase_source(ui, &workspace_command, &args.source, &destination).await?
+    } else {
+        plan_rebase_branch(ui, &workspace_command, &args.branch, &destination).await?
     };
 
     let target_ids = match &loc.target {
