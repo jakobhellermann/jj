@@ -1055,6 +1055,17 @@
                 }
             }
         },
+        "rewrite": {
+            "type": "object",
+            "description": "Settings for commit rewriting (rebase, squash, split, etc.)",
+            "properties": {
+                "preserve-committer-timestamp": {
+                    "type": "boolean",
+                    "description": "If true, preserve the original committer timestamp of rewritten commits instead of resetting it to the current time.",
+                    "default": false
+                }
+            }
+        },
         "hints": {
             "type": "object",
             "description": "Various hints in jj's UI that can be disabled",

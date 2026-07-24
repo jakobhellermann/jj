@@ -232,7 +232,12 @@ impl DetachedCommitBuilder {
         let store = repo.store().clone();
         let mut commit = backend::Commit::clone(predecessor.store_commit());
         commit.predecessors = vec![];
-        commit.committer = settings.signature();
+        let preserve_committer_timestamp = settings
+            .get_bool("rewrite.preserve-committer-timestamp")
+            .unwrap_or_default();
+        if !preserve_committer_timestamp {
+            commit.committer = settings.signature();
+        }
         // If the user had not configured a name and email before but now they have,
         // update the author fields with the new information.
         if commit.author.name.is_empty() {
@@ -241,11 +246,11 @@ impl DetachedCommitBuilder {
         if commit.author.email.is_empty() {
             commit.author.email.clone_from(&commit.committer.email);
         }
-
         // Reset author timestamp on discardable commits if the author is the
         // committer. While it's unlikely we'll have somebody else's commit
         // with no description in our repo, we'd like to be extra safe.
-        if commit.author.name == commit.committer.name
+        if !preserve_committer_timestamp
+            && commit.author.name == commit.committer.name
             && commit.author.email == commit.committer.email
             && predecessor
                 .is_discardable(repo)

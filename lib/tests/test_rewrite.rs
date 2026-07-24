@@ -17,7 +17,11 @@ use std::slice;
 use assert_matches::assert_matches;
 use itertools::Itertools as _;
 use jj_lib::backend::ChangeId;
+use jj_lib::backend::Timestamp;
 use jj_lib::commit::Commit;
+use jj_lib::config::ConfigLayer;
+use jj_lib::config::ConfigSource;
+use jj_lib::config::StackedConfig;
 use jj_lib::matchers::EverythingMatcher;
 use jj_lib::matchers::FilesMatcher;
 use jj_lib::merge::Merge;
@@ -45,6 +49,7 @@ use jj_lib::rewrite::merge_commit_trees;
 use jj_lib::rewrite::merge_commit_trees_no_resolve;
 use jj_lib::rewrite::rebase_commit_with_options;
 use jj_lib::rewrite::restore_tree;
+use jj_lib::settings::UserSettings;
 use maplit::hashmap;
 use maplit::hashset;
 use pollster::FutureExt as _;
@@ -72,6 +77,16 @@ where
         name: name.as_ref(),
         remote: remote.as_ref(),
     }
+}
+
+fn config_with_commit_timestamp(timestamp: &str) -> StackedConfig {
+    let mut config = testutils::base_user_config();
+    let mut layer = ConfigLayer::empty(ConfigSource::User);
+    layer
+        .set_value("debug.commit-timestamp", timestamp)
+        .unwrap();
+    config.add_layer(layer);
+    config
 }
 
 /// Based on https://lore.kernel.org/git/Pine.LNX.4.44.0504271254120.4678-100000@wax.eds.org/
@@ -2479,5 +2494,75 @@ fn test_find_duplicate_divergent_commits() -> TestResult {
     .block_on()?;
     // Commit c2 is a duplicate
     assert_eq!(duplicate_commits, std::slice::from_ref(&commit_c2));
+    Ok(())
+}
+
+#[test]
+fn test_rewrite_preserve_committer_timestamp() -> TestResult {
+    let timestamp1 = "2001-02-03T04:05:06+07:00";
+    let mut config1 = config_with_commit_timestamp(timestamp1);
+    let mut layer = ConfigLayer::empty(ConfigSource::User);
+    layer
+        .set_value("rewrite.preserve-committer-timestamp", true)
+        .unwrap();
+    config1.add_layer(layer);
+    let settings1 = UserSettings::from_config(config1)?;
+    let test_repo = TestRepo::init_with_settings(&settings1);
+    let repo = &test_repo.repo;
+
+    let mut tx = repo.start_transaction();
+    let commit_a = write_random_commit_with_parents(tx.repo_mut(), &[]);
+    let commit_b = write_random_commit_with_parents(tx.repo_mut(), &[&commit_a]);
+    let commit_c = write_random_commit_with_parents(tx.repo_mut(), &[&commit_b]);
+    tx.commit("test").block_on()?;
+
+    let original_timestamp =
+        Timestamp::from_datetime(chrono::DateTime::parse_from_rfc3339(timestamp1)?);
+    assert_eq!(commit_b.committer().timestamp, original_timestamp);
+    assert_eq!(commit_c.committer().timestamp, original_timestamp);
+
+    // Rewrite B with a different commit-timestamp. The committer timestamp
+    // should be preserved because rewrite.preserve-committer-timestamp = true.
+    let timestamp2 = "2002-03-04T05:06:07+08:00";
+    let mut config2 = config_with_commit_timestamp(timestamp2);
+    let mut layer = ConfigLayer::empty(ConfigSource::User);
+    layer
+        .set_value("rewrite.preserve-committer-timestamp", true)
+        .unwrap();
+    config2.add_layer(layer);
+    let settings2 = UserSettings::from_config(config2)?;
+    let repo = test_repo
+        .env
+        .load_repo_at_head(&settings2, test_repo.repo_path());
+    let mut tx = repo.start_transaction();
+    let commit_b = repo.store().get_commit(commit_b.id())?;
+    let commit_c = repo.store().get_commit(commit_c.id())?;
+    let rewritten_b = tx
+        .repo_mut()
+        .rewrite_commit(&commit_b)
+        .set_parents(vec![repo.store().root_commit_id().clone()])
+        .write_unwrap();
+    tx.repo_mut().rebase_descendants().block_on()?;
+    tx.commit("test").block_on()?;
+
+    assert_eq!(rewritten_b.committer().timestamp, original_timestamp);
+
+    // Now rewrite without preservation. The committer timestamp should update.
+    let settings3 = UserSettings::from_config(config_with_commit_timestamp(timestamp2))?;
+    let repo = test_repo
+        .env
+        .load_repo_at_head(&settings3, test_repo.repo_path());
+    let mut tx = repo.start_transaction();
+    let rewritten_b = repo.store().get_commit(rewritten_b.id())?;
+    let rewritten_b2 = tx
+        .repo_mut()
+        .rewrite_commit(&rewritten_b)
+        .set_parents(vec![commit_a.id().clone()])
+        .write_unwrap();
+    tx.repo_mut().rebase_descendants().block_on()?;
+
+    let new_timestamp = Timestamp::from_datetime(chrono::DateTime::parse_from_rfc3339(timestamp2)?);
+    assert_eq!(rewritten_b2.committer().timestamp, new_timestamp);
+
     Ok(())
 }

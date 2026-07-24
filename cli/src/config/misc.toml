@@ -66,3 +66,6 @@ auto-update-stale = false
 # in the future.
 [split]
 legacy-bookmark-behavior = true
+
+[rewrite]
+preserve-committer-timestamp = false
