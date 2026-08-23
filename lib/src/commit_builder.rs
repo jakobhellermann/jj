@@ -414,12 +414,31 @@ impl DetachedCommitBuilder {
                 // TODO: indexing error shouldn't be a "BackendError"
                 .map_err(|err| BackendError::Other(err.into()))?
         {
-            // Recording existing commit as new would create cycle in
-            // predecessors/parent mappings within the current transaction, and
-            // in predecessors graph globally.
-            return Err(BackendError::Other(
-                format!("Newly-created commit {id} already exists", id = commit.id()).into(),
-            ));
+            // The new commit's id already exists in the index. A rewrite normally
+            // gets a fresh id because the committer timestamp is reset, but
+            // `rewrite.preserve-committer-timestamp` can reproduce the id of a
+            // commit that is still indexed while no longer visible (e.g. redoing a
+            // rewrite after an undo). Resurrecting such a hidden commit is fine.
+            // Reject only the cases that would corrupt the repo's bookkeeping:
+            // - the colliding commit is still visible, so recording it as new would clobber
+            //   its predecessors/parents, or
+            // - the rewrite lands on its own source or a descendant of it, which makes
+            //   `parent_mapping` cyclic and hangs `rebase_descendants`.
+            let lands_on_source = match &self.rewrite_source {
+                Some(source) => {
+                    commit.id() == source.id()
+                        || mut_repo
+                            .index()
+                            .is_ancestor(source.id(), commit.id())
+                            .map_err(|err| BackendError::Other(err.into()))?
+                }
+                None => false,
+            };
+            if lands_on_source || commit_is_visible(mut_repo, commit.id())? {
+                return Err(BackendError::Other(
+                    format!("Newly-created commit {id} already exists", id = commit.id()).into(),
+                ));
+            }
         }
         mut_repo.add_head(&commit).await?;
         mut_repo.set_predecessors(commit.id().clone(), self.predecessors);
@@ -470,4 +489,24 @@ async fn write_to_store(
     store
         .write_commit(commit, should_sign.then_some(&mut &sign_fn))
         .await
+}
+
+/// Whether `id` is reachable from the repo's visible heads (as opposed to a
+/// hidden commit that merely remains in the index).
+fn commit_is_visible(repo: &MutableRepo, id: &CommitId) -> BackendResult<bool> {
+    let index = repo.index();
+    let heads = repo.view().heads();
+    if heads.contains(id) {
+        return Ok(true);
+    }
+    for head in heads {
+        if index
+            .is_ancestor(id, head)
+            // TODO: indexing error shouldn't be a "BackendError"
+            .map_err(|err| BackendError::Other(err.into()))?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

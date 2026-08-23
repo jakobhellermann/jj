@@ -2566,3 +2566,66 @@ fn test_rewrite_preserve_committer_timestamp() -> TestResult {
 
     Ok(())
 }
+
+#[test]
+fn test_rewrite_recreates_undone_commit() -> TestResult {
+    // Regression test for a crash reachable via
+    // `rewrite.preserve-committer-timestamp`: redoing a rewrite after `jj undo`
+    // reproduces the previous rewrite's commit id, which is still in the index
+    // though it was hidden by the undo. This must resurrect that commit instead
+    // of failing with "Newly-created commit ... already exists".
+    let timestamp = "2001-02-03T04:05:06+07:00";
+    let mut config = config_with_commit_timestamp(timestamp);
+    let mut layer = ConfigLayer::empty(ConfigSource::User);
+    layer
+        .set_value("rewrite.preserve-committer-timestamp", true)
+        .unwrap();
+    config.add_layer(layer);
+    let settings = UserSettings::from_config(config)?;
+    let test_repo = TestRepo::init_with_settings(&settings);
+    let repo = &test_repo.repo;
+    let root_id = repo.store().root_commit_id().clone();
+
+    // op1: commit B on top of A.
+    let mut tx = repo.start_transaction();
+    let commit_a = write_random_commit_with_parents(tx.repo_mut(), &[]);
+    let commit_b = write_random_commit_with_parents(tx.repo_mut(), &[&commit_a]);
+    let repo = tx.commit("create").block_on()?;
+    let view_before_rewrite = repo.view().store_view().clone();
+
+    // op2: rewrite B onto the root. This creates and indexes B'.
+    let mut tx = repo.start_transaction();
+    let rewritten_b = tx
+        .repo_mut()
+        .rewrite_commit(&commit_b)
+        .set_parents(vec![root_id.clone()])
+        .write_unwrap();
+    tx.repo_mut().rebase_descendants().block_on()?;
+    let repo = tx.commit("rewrite B").block_on()?;
+
+    // op3 == `jj undo`: restore the pre-rewrite view. B' is no longer visible, but
+    // the operation is a child of op2, so B' remains in the index.
+    let mut tx = repo.start_transaction();
+    tx.repo_mut().set_view(view_before_rewrite);
+    let repo = tx.commit("undo").block_on()?;
+    assert!(repo.index().has_id(rewritten_b.id()).unwrap());
+    assert!(!repo.view().heads().contains(rewritten_b.id()));
+
+    // op4: perform the identical rewrite again. It reproduces B''s id; before the
+    // fix this errored, now it resurrects the hidden commit.
+    let mut tx = repo.start_transaction();
+    let commit_b = repo.store().get_commit(commit_b.id())?;
+    let rewritten_b2 = tx
+        .repo_mut()
+        .rewrite_commit(&commit_b)
+        .set_parents(vec![root_id.clone()])
+        .write_unwrap();
+    tx.repo_mut().rebase_descendants().block_on()?;
+    let repo = tx.commit("redo").block_on()?;
+
+    // The same commit is resurrected and visible again; the source is now hidden.
+    assert_eq!(rewritten_b2.id(), rewritten_b.id());
+    assert!(repo.view().heads().contains(rewritten_b.id()));
+    assert!(!repo.view().heads().contains(commit_b.id()));
+    Ok(())
+}
